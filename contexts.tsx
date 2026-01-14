@@ -1,0 +1,1258 @@
+
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { Role, Theme, Language, UserProfile, NavNode, AIAgent, PromptTemplate, IntegrationConfig } from './types';
+import { ToastMessage, ToastType } from './components/Toast';
+import { MOCK_GlobalStandards, INITIAL_USERS, INITIAL_AGENTS, NAV_TREE } from './constants';
+import { api } from './client';
+
+// --- Auth Context ---
+interface AuthContextType {
+  user: UserProfile;
+  allUsers: UserProfile[];
+  isAuthenticated: boolean;
+  login: (email: string, password?: string) => Promise<void>;
+  sendLoginCode: (email: string) => Promise<void>;
+  loginWithCode: (email: string, code: string) => Promise<void>;
+  logout: () => void;
+  switchRole: (role: Role) => void;
+  updateProfile: (data: Partial<UserProfile>) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  // User Management Actions
+  addUser: (user: Omit<UserProfile, 'id' | 'avatar' | 'status'>) => Promise<void>;
+  updateUser: (id: string, updates: Partial<UserProfile>) => Promise<void>;
+  toggleUserStatus: (id: string) => Promise<void>;
+  resetUserPassword: (id: string) => Promise<void>;
+  // RBAC Permissions (Granular)
+  canManageUsers: boolean;           // Admin only
+  canManageGlobalStandards: boolean; // Admin, PM
+  canManageStructure: boolean;       // Admin, PM
+  canEditContent: boolean;           // Admin, PM, Expert
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [allUsers, setAllUsers] = useState<UserProfile[]>(INITIAL_USERS);
+  const [user, setUser] = useState<UserProfile>(INITIAL_USERS[0]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Added loading state
+
+  // Restore session from localStorage on mount
+  useEffect(() => {
+    const storedUser = localStorage.getItem('t_engine_user');
+    const storedAuth = localStorage.getItem('t_engine_auth');
+    
+    if (storedAuth === 'true' && storedUser) {
+        try {
+            const parsedUser = JSON.parse(storedUser);
+            setUser(parsedUser);
+            setIsAuthenticated(true);
+        } catch (e) {
+            console.error("Failed to restore session", e);
+            localStorage.removeItem('t_engine_user');
+            localStorage.removeItem('t_engine_auth');
+        }
+    }
+    setIsLoading(false);
+  }, []);
+
+  // Fetch users from backend on mount
+  useEffect(() => {
+    const fetchUsers = async () => {
+        try {
+            const users = await api.users.getAll();
+            setAllUsers(users);
+        } catch (err) {
+            console.error('Failed to fetch users:', err);
+        }
+    };
+    fetchUsers();
+  }, []);
+
+  const login = async (email: string, password?: string) => {
+    try {
+        const { user: loggedInUser } = await api.auth.login(email, password);
+        setUser(loggedInUser);
+        setIsAuthenticated(true);
+        
+        // Persist session
+        localStorage.setItem('t_engine_user', JSON.stringify(loggedInUser));
+        localStorage.setItem('t_engine_auth', 'true');
+    } catch (error) {
+        throw new Error('Login failed: ' + (error as Error).message);
+    }
+  };
+
+  const sendLoginCode = async (email: string) => {
+    await api.auth.sendLoginCode(email);
+  };
+
+  const loginWithCode = async (email: string, code: string) => {
+    try {
+        const { user: loggedInUser } = await api.auth.loginWithCode(email, code);
+        setUser(loggedInUser);
+        setIsAuthenticated(true);
+        localStorage.setItem('t_engine_user', JSON.stringify(loggedInUser));
+        localStorage.setItem('t_engine_auth', 'true');
+    } catch (error) {
+        throw new Error('Login failed: ' + (error as Error).message);
+    }
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+    setUser(INITIAL_USERS[0]); 
+    // Clear session
+    localStorage.removeItem('t_engine_user');
+    localStorage.removeItem('t_engine_auth');
+  };
+
+  const switchRole = (role: Role) => {
+    const target = allUsers.find(u => u.role === role);
+    if (target) setUser(target);
+  };
+
+  const updateProfile = async (data: Partial<UserProfile>) => {
+    try {
+        if (!user || !user.id) throw new Error('User not logged in');
+        
+        // Optimistic update
+        const updatedLocal = { ...user, ...data };
+        setUser(updatedLocal);
+        setAllUsers(list => list.map(u => u.id === user.id ? updatedLocal : u));
+        
+        // Update storage
+        localStorage.setItem('t_engine_user', JSON.stringify(updatedLocal));
+
+        // Sync with backend
+        await api.auth.updateProfile(user.id, data);
+        
+        // Audit
+        api.logs.addAudit({
+            id: '', // Generated by backend
+            timestamp: '', // Generated by backend
+            ip: '', // Generated by backend
+            userId: user.id,
+            userName: updatedLocal.name,
+            action: 'Update Profile',
+            module: 'Settings',
+            details: `Updated fields: ${Object.keys(data).join(', ')}`,
+            status: 'success'
+        }).catch(console.error);
+
+    } catch (error) {
+        // Rollback on error
+        console.error('Failed to sync profile update:', error);
+        
+        // Audit Failure
+        if (user && user.id) {
+             api.logs.addAudit({
+                id: '',
+                timestamp: '',
+                ip: '',
+                userId: user.id,
+                userName: user.name,
+                action: 'Update Profile',
+                module: 'Settings',
+                details: `Failed to update: ${(error as Error).message}`,
+                status: 'failed'
+            }).catch(console.error);
+        }
+        
+        // Force refetch or rollback logic could go here
+        // For now, re-throw so UI knows it failed
+        throw error;
+    }
+  };
+
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    try {
+        if (!user || !user.id) throw new Error('User not logged in');
+        if (currentPassword === newPassword) {
+            throw new Error('New password must be different from current password');
+        }
+        await api.auth.changePassword(user.id, currentPassword, newPassword);
+    } catch (error) {
+        throw new Error('Password change failed: ' + (error as Error).message);
+    }
+  };
+
+  const addUser = async (newUser: Omit<UserProfile, 'id' | 'avatar' | 'status'>) => {
+    try {
+        const userToCreate = {
+            ...newUser,
+            avatar: newUser.name.charAt(0).toUpperCase(),
+            status: 'active' as const
+        };
+        const createdUser = await api.users.create(userToCreate);
+        setAllUsers(prev => [...prev, createdUser]);
+    } catch (error) {
+        throw new Error('Failed to add user: ' + (error as Error).message);
+    }
+  };
+
+  const updateUser = async (id: string, updates: Partial<UserProfile>) => {
+    try {
+        const updatedUser = await api.users.update(id, updates);
+        setAllUsers(prev => prev.map(u => u.id === id ? updatedUser : u));
+        
+        // If updating self, update user state too
+        if (user && user.id === id) {
+            setUser(updatedUser);
+        }
+    } catch (error) {
+        throw new Error('Failed to update user: ' + (error as Error).message);
+    }
+  };
+
+  const toggleUserStatus = async (id: string) => {
+    try {
+        await api.users.toggleStatus(id);
+        setAllUsers(prev => prev.map(u => {
+            if (u.id === id) {
+                return { ...u, status: u.status === 'active' ? 'disabled' : 'active' };
+            }
+            return u;
+        }));
+    } catch (error) {
+        throw new Error('Failed to toggle user status');
+    }
+  };
+
+  const resetUserPassword = async (id: string) => {
+    try {
+        await api.users.resetPassword(id);
+    } catch (error) {
+        throw error;
+    }
+  };
+
+  // --- Permission Matrix Logic ---
+  const isActive = user.status === 'active';
+  
+  // 1. User Management: Admin only
+  const canManageUsers = user.role === 'Admin' && isActive;
+  
+  // 2. Global Standards: Admin, PM
+  const canManageGlobalStandards = (user.role === 'Admin' || user.role === 'PM') && isActive;
+  
+  // 3. Menu Tree Editing: Admin, PM
+  const canManageStructure = (user.role === 'Admin' || user.role === 'PM') && isActive;
+  
+  // 4. Content Editing (Reqs, Logic, Knowledge): Admin, PM, Expert
+  // Dev is Read-Only for content, but can Export AI Context.
+  const canEditContent = (user.role === 'Admin' || user.role === 'PM' || user.role === 'Expert') && isActive;
+
+  if (isLoading) {
+      return null; // Or a loading spinner component
+  }
+
+  return (
+    <AuthContext.Provider value={{ 
+      user, 
+      allUsers,
+      isAuthenticated, 
+      login, 
+      sendLoginCode,
+      loginWithCode,
+      logout, 
+      switchRole, 
+      updateProfile,
+      changePassword,
+      addUser,
+      updateUser,
+      toggleUserStatus,
+      resetUserPassword,
+      canManageUsers,
+      canManageGlobalStandards,
+      canManageStructure,
+      canEditContent
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  return context;
+};
+
+// --- Settings Context ---
+interface SettingsContextType {
+  theme: Theme;
+  toggleTheme: () => void;
+  setTheme: (theme: Theme) => void;
+  language: Language;
+  setLanguage: (lang: Language) => void;
+  timezoneOffset: number;
+  setTimezoneOffset: (offset: number) => void;
+  formatTime: (isoString: string) => string;
+}
+
+const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
+
+export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user, updateProfile } = useAuth(); // We need auth to sync settings
+  
+  const [theme, setTheme] = useState<Theme>('system'); // Default to system
+  const [language, setLanguage] = useState<Language>('zh');
+  const [timezoneOffset, setTimezoneOffset] = useState<number>(8); 
+
+  // Sync from user profile when logged in
+  useEffect(() => {
+    if (user?.preferences) {
+        if (user.preferences.theme) setTheme(user.preferences.theme);
+        if (user.preferences.language) setLanguage(user.preferences.language);
+        if (user.preferences.timezoneOffset !== undefined) setTimezoneOffset(user.preferences.timezoneOffset);
+    }
+  }, [user]);
+
+  // Sync to backend when settings change
+  // We use a debounced effect or just explicit update calls.
+  // Ideally, the setters should trigger the update.
+  
+  const updateBackend = (newPrefs: any) => {
+      if (user && user.id) {
+          updateProfile({ 
+              preferences: { 
+                  theme: newPrefs.theme ?? theme,
+                  language: newPrefs.language ?? language,
+                  timezoneOffset: newPrefs.timezoneOffset ?? timezoneOffset
+              } 
+          });
+      }
+  };
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+
+    const applyTheme = () => {
+        let effectiveTheme = theme;
+        if (theme === 'system') {
+            effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+
+        if (effectiveTheme === 'dark') {
+            root.classList.add('dark');
+        } else {
+            root.classList.remove('dark');
+        }
+    };
+
+    applyTheme();
+
+    if (theme === 'system') {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handler = () => applyTheme();
+        mediaQuery.addEventListener('change', handler);
+        return () => mediaQuery.removeEventListener('change', handler);
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => {
+        let next: Theme = 'system';
+        if (prev === 'system') next = 'light';
+        else if (prev === 'light') next = 'dark';
+        else next = 'system';
+        
+        updateBackend({ theme: next });
+        return next;
+    });
+  };
+
+  const handleSetTheme = (newTheme: Theme) => {
+      setTheme(newTheme);
+      updateBackend({ theme: newTheme });
+  };
+
+  const handleSetLanguage = (newLang: Language) => {
+      setLanguage(newLang);
+      updateBackend({ language: newLang });
+  };
+
+  const handleSetTimezone = (newOffset: number) => {
+      setTimezoneOffset(newOffset);
+      updateBackend({ timezoneOffset: newOffset });
+  };
+
+  const formatTime = (isoString: string) => {
+    if (!isoString) return '--';
+    const date = new Date(isoString);
+    const utc = date.getTime() + date.getTimezoneOffset() * 60000;
+    const targetTime = new Date(utc + 3600000 * timezoneOffset);
+    
+    return targetTime.toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US', {
+      hour12: false,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  return (
+    <SettingsContext.Provider
+      value={{
+        theme,
+        toggleTheme,
+        setTheme: handleSetTheme,
+        language,
+        setLanguage: handleSetLanguage,
+        timezoneOffset,
+        setTimezoneOffset: handleSetTimezone,
+        formatTime,
+      }}
+    >
+      {children}
+    </SettingsContext.Provider>
+  );
+};
+
+export const useSettings = () => {
+  const context = useContext(SettingsContext);
+  if (!context) throw new Error('useSettings must be used within SettingsProvider');
+  return context;
+};
+
+  // --- Agent Context ---
+interface AgentContextType {
+  agents: AIAgent[];
+  addAgent: (agent: Omit<AIAgent, 'id' | 'status'>) => Promise<void>;
+  updateAgent: (id: string, updates: Partial<AIAgent>) => Promise<void>;
+  deleteAgent: (id: string) => Promise<void>;
+  // Prompt Methods
+  getPrompts: (agentId: string) => Promise<PromptTemplate[]>;
+  addPrompt: (agentId: string, prompt: PromptTemplate) => Promise<void>;
+  updatePrompt: (agentId: string, prompt: PromptTemplate) => Promise<void>;
+  deletePrompt: (agentId: string, promptId: string) => Promise<void>;
+}
+
+const AgentContext = createContext<AgentContextType | undefined>(undefined);
+
+export const AgentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [agents, setAgents] = useState<AIAgent[]>([]);
+
+  useEffect(() => {
+    api.agents.getAll().then(setAgents).catch(console.error);
+  }, []);
+
+  const addAgent = async (newAgent: Omit<AIAgent, 'id' | 'status'>) => {
+      try {
+          const created = await api.agents.create(newAgent);
+          setAgents(prev => [...prev, created]);
+      } catch (e) {
+          console.error('Failed to create agent', e);
+          throw e;
+      }
+  };
+
+  const updateAgent = async (id: string, updates: Partial<AIAgent>) => {
+      try {
+          const updated = await api.agents.update(id, updates);
+          setAgents(prev => prev.map(a => a.id === id ? updated : a));
+      } catch (e) {
+          console.error('Failed to update agent', e);
+          throw e;
+      }
+  };
+
+  const deleteAgent = async (id: string) => {
+      try {
+          await api.agents.delete(id);
+          setAgents(prev => prev.filter(a => a.id !== id));
+      } catch (e) {
+          console.error('Failed to delete agent', e);
+          throw e;
+      }
+  };
+
+  const getPrompts = async (agentId: string) => {
+      return await api.agents.getPrompts(agentId);
+  };
+
+  const addPrompt = async (agentId: string, prompt: PromptTemplate) => {
+      await api.agents.addPrompt(agentId, prompt);
+      // Optionally refresh agents or just rely on local state if needed, 
+      // but prompts are usually fetched on demand in the UI
+  };
+
+  const updatePrompt = async (agentId: string, prompt: PromptTemplate) => {
+      await api.agents.updatePrompt(agentId, prompt);
+  };
+
+  const deletePrompt = async (agentId: string, promptId: string) => {
+      await api.agents.deletePrompt(agentId, promptId);
+  };
+
+  return (
+      <AgentContext.Provider value={{ 
+          agents, 
+          addAgent, 
+          updateAgent, 
+          deleteAgent,
+          getPrompts,
+          addPrompt,
+          updatePrompt,
+          deletePrompt
+      }}>
+          {children}
+      </AgentContext.Provider>
+  );
+};
+
+export const useAgents = () => {
+    const context = useContext(AgentContext);
+    if (!context) throw new Error('useAgents must be used within AgentProvider');
+    return context;
+};
+
+// --- Navigation Context ---
+interface NavigationContextType {
+  tree: NavNode[];
+  globalStandards: string;
+  updateGlobalStandards: (content: string) => void;
+  addNode: (parentId: string, type: 'folder' | 'module', label: string, labelZh: string, description?: string) => void;
+  updateNode: (id: string, updates: Partial<NavNode>) => void;
+  deleteNode: (id: string) => void;
+  moveNode: (dragId: string, targetId: string, position: 'top' | 'inside' | 'bottom') => void;
+  toggleReady: (id: string) => void;
+  importTree: (newTree: NavNode[]) => void;
+}
+
+const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
+
+export const NavigationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth(); // Get auth state
+  const { addToast } = useToast();
+  const { language } = useSettings();
+  const [tree, setTree] = useState<NavNode[]>([]);
+  const [globalStandards, setGlobalStandards] = useState<string>('');
+  const [isTreeLoaded, setIsTreeLoaded] = useState(false);
+  const [isNavDbAvailable, setIsNavDbAvailable] = useState(true);
+  
+  // Track last saved state to prevent redundant saves on load
+  const lastSavedTreeRef = React.useRef<string>('');
+
+  // Fetch tree when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+        setTree([]); // Clear tree on logout
+        setIsTreeLoaded(false);
+        setIsNavDbAvailable(true);
+        lastSavedTreeRef.current = '';
+        return;
+    }
+
+    api.navigation.getTree().then(data => {
+        setTree(data);
+        lastSavedTreeRef.current = JSON.stringify(data); // Sync ref
+        setIsTreeLoaded(true);
+        setIsNavDbAvailable(true);
+    }).catch((e) => {
+        console.error(e);
+        setTree(NAV_TREE);
+        lastSavedTreeRef.current = JSON.stringify(NAV_TREE);
+        setIsTreeLoaded(true);
+        setIsNavDbAvailable(false);
+        addToast(language === 'zh' ? '当前使用静态树/数据库不可用' : 'Using static tree (DB unavailable)', 'error');
+    });
+    
+    api.navigation.getGlobalStandards().then(setGlobalStandards).catch(() => {
+        setGlobalStandards(MOCK_GlobalStandards); 
+    });
+  }, [isAuthenticated]); // Re-run on auth change
+
+  // Debounced save
+  // DEPRECATED: We are moving to granular updates.
+  // However, we might keep this for "fallback" or "importTree" scenarios?
+  // But for now, let's DISABLE it to prove the point of granular updates.
+  // Actually, importTree calls saveTree directly.
+  // So we can remove this useEffect entirely!
+  /*
+  useEffect(() => {
+    if (!isTreeLoaded) return;
+    if (!isNavDbAvailable) return;
+
+    const currentTreeStr = JSON.stringify(tree);
+    if (currentTreeStr === lastSavedTreeRef.current) {
+        return;
+    }
+
+    const timer = setTimeout(() => {
+        api.navigation.saveTree(tree).then(() => {
+            lastSavedTreeRef.current = currentTreeStr;
+        }).catch((e) => {
+          if (e.name === 'AbortError' || e.message === 'Failed to fetch') {
+             console.warn('Save aborted or network failed (likely page refresh)');
+             return;
+          }
+          console.error(e);
+          setIsNavDbAvailable(false);
+          addToast(language === 'zh' ? '全景树保存失败，请检查数据库连接/权限' : 'Failed to save navigation tree (check DB/permissions)', 'error');
+        });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [tree, isTreeLoaded, isNavDbAvailable, addToast]);
+  */
+
+  // --- Recursive Helpers (Pure Functions) ---
+
+  const mapTree = useCallback((nodes: NavNode[], fn: (node: NavNode) => NavNode): NavNode[] => {
+    return nodes.map(node => {
+      // 1. Transform current node
+      const updatedNode = fn(node);
+      
+      // 2. Recurse children if they exist
+      if (updatedNode.children) {
+        return { 
+          ...updatedNode, 
+          children: mapTree(updatedNode.children, fn) 
+        };
+      }
+      return updatedNode;
+    });
+  }, []);
+
+  const addToTree = useCallback((nodes: NavNode[], parentId: string, newNode: NavNode): NavNode[] => {
+    return nodes.map(node => {
+      // 1. Match Parent
+      if (node.id === parentId) {
+        return { 
+          ...node, 
+          children: [...(node.children || []), newNode] 
+        };
+      }
+      
+      // 2. Recurse if children exist
+      if (node.children) {
+        return { 
+          ...node, 
+          children: addToTree(node.children, parentId, newNode) 
+        };
+      }
+
+      // 3. No match, return original
+      return node;
+    });
+  }, []);
+
+  const deleteFromTree = useCallback((nodes: NavNode[], targetId: string): NavNode[] => {
+    return nodes
+      .filter(node => node.id !== targetId) // 1. Filter out from current level
+      .map(node => ({
+        ...node,
+        // 2. Recurse into children if they exist
+        children: node.children ? deleteFromTree(node.children, targetId) : undefined
+      }));
+  }, []);
+
+  // --- Actions ---
+
+  const addNode = useCallback(async (parentId: string, type: 'folder' | 'module', label: string, labelZh: string, description?: string) => {
+    // 1. Optimistic Update (Temporary ID)
+    const tempId = `temp_${Date.now()}`;
+    const newNode: NavNode = {
+      id: tempId,
+      label,
+      labelZh,
+      description: description || '',
+      type,
+      status: 'draft',
+      icon: type === 'folder' ? 'folder' : 'box',
+      children: type === 'folder' ? [] : undefined
+    };
+
+    if (parentId === 'root') {
+      setTree(prev => [...prev, newNode]);
+    } else {
+      setTree(prev => addToTree(prev, parentId, newNode));
+    }
+
+    // 2. Server Call
+    try {
+        const parentKey = parentId === 'root' ? null : parentId;
+        const savedNode = await api.navigation.addNode({ 
+            key: tempId, // Send temp ID as key initially? Or let server gen? 
+                         // Better: We generate a stable ID (timestamp) as key and send it.
+            label, 
+            labelZh, 
+            description, 
+            type,
+            parentKey 
+        });
+        
+        // 3. Reconcile ID if needed (though we used tempId as key, so it should match)
+        // If server returns normalized data, we might want to update local state to match exact server response
+        setTree(prev => mapTree(prev, node => node.id === tempId ? savedNode : node));
+        
+        // Update ref to avoid redundant full-save if we still had that logic (which we are removing)
+        lastSavedTreeRef.current = JSON.stringify(tree); // Approximation
+        
+    } catch (e) {
+        console.error('Failed to add node:', e);
+        // Rollback
+        setTree(prev => deleteFromTree(prev, tempId));
+        addToast(language === 'zh' ? '添加失败' : 'Failed to add node', 'error');
+    }
+  }, [addToTree, mapTree, deleteFromTree, addToast, language, tree]);
+
+  const updateNode = useCallback(async (id: string, updates: Partial<NavNode>) => {
+    // 1. Optimistic Update
+    let previousNode: NavNode | undefined;
+    setTree(prev => mapTree(prev, node => {
+        if (node.id === id) {
+            previousNode = node;
+            return { ...node, ...updates };
+        }
+        return node;
+    }));
+
+    // 2. Server Call
+    try {
+        await api.navigation.updateNode(id, updates);
+    } catch (e) {
+        console.error('Failed to update node:', e);
+        // Rollback
+        if (previousNode) {
+            setTree(prev => mapTree(prev, node => node.id === id ? previousNode! : node));
+        }
+        addToast(language === 'zh' ? '更新失败' : 'Failed to update node', 'error');
+    }
+  }, [mapTree, addToast, language]);
+
+  const deleteNode = useCallback(async (id: string) => {
+    // 1. Optimistic Update
+    // We need to keep a copy of the deleted node (and its subtree) for rollback
+    // For simplicity, we just refetch tree on error or store whole tree?
+    // Let's store whole tree snapshot for rollback is safest for delete
+    const previousTree = tree;
+    setTree(prev => deleteFromTree(prev, id));
+
+    // 2. Server Call
+    try {
+        await api.navigation.deleteNode(id);
+    } catch (e) {
+        console.error('Failed to delete node:', e);
+        // Rollback
+        setTree(previousTree);
+        addToast(language === 'zh' ? '删除失败' : 'Failed to delete node', 'error');
+    }
+  }, [deleteFromTree, tree, addToast, language]);
+
+  const toggleReady = useCallback(async (id: string) => {
+    // Find current status to toggle
+    // This is just a wrapper around updateNode
+    // But we need the current status first.
+    // Optimistic update assumes we know the current state from 'tree'
+    // But 'updateNode' helper handles the map.
+    
+    // We can't easily get 'currentNode' inside setState updater for the API call outside.
+    // So we traverse tree first to find it.
+    let targetNode: NavNode | undefined;
+    const find = (nodes: NavNode[]) => {
+        for (const n of nodes) {
+            if (n.id === id) targetNode = n;
+            if (n.children) find(n.children);
+        }
+    };
+    find(tree);
+    
+    if (!targetNode) return;
+    
+    const newStatus = targetNode.status === 'ready' ? 'draft' : 'ready';
+    updateNode(id, { status: newStatus as any });
+  }, [tree, updateNode]);
+
+  const moveNode = useCallback(async (dragId: string, targetId: string, position: 'top' | 'inside' | 'bottom') => {
+    if (dragId === targetId) return;
+
+    const previousTree = tree;
+
+    setTree(prevTree => {
+      // ... (Existing move logic reuse)
+      // 1. Find and extract the dragged node
+      let draggedNode: NavNode | undefined;
+      const extract = (nodes: NavNode[]): NavNode[] => {
+        const result: NavNode[] = [];
+        for (const node of nodes) {
+          if (node.id === dragId) {
+            draggedNode = node;
+            continue; 
+          }
+          if (node.children) {
+            const newChildren = extract(node.children);
+            result.push({ ...node, children: newChildren });
+          } else {
+            result.push(node);
+          }
+        }
+        return result;
+      };
+      const treeWithoutDragged = extract(prevTree);
+      if (!draggedNode) return prevTree; 
+
+      // 2. Insert the node at the new position
+      const insert = (nodes: NavNode[]): NavNode[] => {
+        return nodes.flatMap(node => {
+          if (node.id === targetId) {
+            if (position === 'top') {
+              return [draggedNode!, node];
+            } else if (position === 'bottom') {
+              return [node, draggedNode!];
+            } else if (position === 'inside') {
+              return [{
+                ...node,
+                children: node.children ? [...node.children, draggedNode!] : [draggedNode!]
+              }];
+            }
+          }
+          if (node.children) {
+            return [{ ...node, children: insert(node.children) }];
+          }
+          return [node];
+        });
+      };
+      return insert(treeWithoutDragged);
+    });
+
+    // Server Call
+    try {
+        // Calculate new sortOrder?
+        // The backend `moveNode` takes (key, parentId, sortOrder).
+        // Frontend tree doesn't maintain explicit sortOrder numbers easily during drag.
+        // BUT: The backend needs to know where to put it.
+        // If we want exact order persistence, we need to recalculate sortOrders for siblings?
+        // Or simpler: send the "targetId" and "position" to backend and let backend logic handle sortOrder calc?
+        // The proposed API `moveNavigationNode` takes `sortOrder`.
+        // To do this right, we need to know the index in the new list.
+        
+        // Let's assume for now we just want parent update (if inside) or reorder.
+        // Calculating exact sortOrder is complex on frontend.
+        // Alternative: Backend API `moveNode(key, targetId, position)` is smarter.
+        // But I implemented `moveNavigationNode(key, parentKey, sortOrder)`.
+        
+        // Let's update `moveNode` to be `moveNode(key, parentKey, sortOrder)`.
+        // But UI gives `targetId` and `position`.
+        // We need to map `targetId/position` -> `parentId/sortOrder`.
+        
+        // This mapping is tricky without traversing the *updated* tree.
+        // Since we already updated `tree` state, we could wait for effect? No, closure closure.
+        
+        // Simplified approach for MVP Refactor:
+        // Just trigger a full save for Move operations? 
+        // User asked for "Real-time save modification" via granular updates.
+        // Moving is the hardest to granularize without index management.
+        
+        // Let's stick to the granular API but we need to find the new parent and index.
+        // We can traverse the `previousTree` (actually we need the NEW tree).
+        // Since `setTree` is async, we can't see new tree yet.
+        
+        // Hack: We can compute the move locally *before* setTree to get params.
+        
+        // ... (complex logic omitted for brevity, falling back to full save for MOVE only?)
+        // Or better: Just implement the logic to find parent/index on the *resulting* structure simulation.
+        
+        // Let's try to derive parentId from targetId/position.
+        let parentId: string | null = null;
+        if (position === 'inside') {
+            parentId = targetId;
+        } else {
+            // Sibling: parent is same as target's parent.
+            // Need to find target's parent in `previousTree`.
+            const findParent = (nodes: NavNode[], target: string, parent: string | null = 'root'): string | null => {
+                for (const n of nodes) {
+                    if (n.id === target) return parent;
+                    if (n.children) {
+                        const res = findParent(n.children, target, n.id);
+                        if (res) return res;
+                    }
+                }
+                return null;
+            };
+            const p = findParent(previousTree, targetId);
+            parentId = p === 'root' ? null : p;
+        }
+        
+        // Sort Order: rough estimate or just 0?
+        // If we want correct ordering, we really need the index.
+        // For this iteration, let's pass 0 and accept that order might not persist perfectly 
+        // unless we fully implement list re-indexing.
+        // OR: Send `targetId` + `position` to backend and let backend handle it?
+        // The current backend `moveNavigationNode` expects explicit `sortOrder`.
+        
+        // Let's just send `sortOrder: 9999` for now (append) or try to guess.
+        
+        // --- UPDATED: Batch Reorder Logic ---
+        
+        // 1. Determine new parent ID
+        let newParentId: string | null = null;
+        if (position === 'inside') {
+            newParentId = targetId;
+        } else {
+            // Find parent of target in the NEW tree (or previous, structure is similar for parent lookup)
+            // Using a helper to find parent of a node
+            const findParent = (nodes: NavNode[], target: string, parent: string | null = 'root'): string | null => {
+                for (const n of nodes) {
+                    if (n.id === target) return parent;
+                    if (n.children) {
+                        const res = findParent(n.children, target, n.id);
+                        if (res) return res;
+                    }
+                }
+                return null;
+            };
+            // Note: We should search in `previousTree` because `targetId` location hasn't changed relative to its parent 
+            // (unless target was dragId, which is impossible).
+            // Actually, if we use `tree` (from state), it might be stale inside callback? 
+            // No, `tree` in dependency is fresh. But `setTree` updater uses `prevTree`.
+            // Let's use `previousTree` which is captured `tree`.
+            const p = findParent(previousTree, targetId);
+            newParentId = p === 'root' ? null : p;
+        }
+
+        // 2. Perform the Move (Atomic)
+        await api.navigation.moveNode(dragId, newParentId, 9999); 
+
+        // 3. Calculate new order for siblings and Batch Reorder
+        // We need the *updated* list of siblings. 
+        // We can simulate it based on `prevTree` + move logic, OR we can fetch it?
+        // Fetching is safer but slower. 
+        // Let's use the local state `setTree` logic result.
+        // But `setTree` is async and we don't have the result variable here easily without duplicating logic.
+        // Let's duplicate the logic to get the new siblings list.
+        
+        // Re-simulate move to get siblings:
+        // (A bit redundant but safe)
+        const simulateTree = JSON.parse(JSON.stringify(previousTree)); // Deep clone
+        // ... (Same extract/insert logic as above) ...
+        // Simplified: We know the new parent. We just need to find the node's new siblings in the *new* structure.
+        // Actually, we can wait for the next render? No.
+        
+        // Alternative: Construct the ordered ID list manually.
+        // 1. Get siblings of target (if sibling move) or children of target (if inside move).
+        // 2. Filter out dragId (it's moving).
+        // 3. Insert dragId at correct index.
+        
+        let siblings: NavNode[] = [];
+        if (newParentId === null) {
+            siblings = [...previousTree];
+        } else {
+            const findNode = (nodes: NavNode[], id: string): NavNode | undefined => {
+                for (const n of nodes) {
+                    if (n.id === id) return n;
+                    if (n.children) {
+                        const found = findNode(n.children, id);
+                        if (found) return found;
+                    }
+                }
+            };
+            const parentNode = findNode(previousTree, newParentId);
+            siblings = parentNode?.children ? [...parentNode.children] : [];
+        }
+        
+        // Remove dragged node from old location in this temporary list
+        // (Only if it was in the same list, but `siblings` here is the *destination* list)
+        // If source == destination parent, we need to remove first.
+        // If source != destination, we just insert.
+        
+        // Actually, `siblings` from `previousTree` contains the state *before* move.
+        // If moving within same parent: remove then insert.
+        // If moving to different parent: just insert.
+        
+        // Let's use a simpler heuristic:
+        // We need the final order of IDs in the destination parent.
+        // Since we already updated the UI tree via `setTree`, the user sees the correct order.
+        // We just need to capture that order.
+        
+        // HACK: Use `setTimeout` to read the updated `tree` state? 
+        // No, `tree` in closure is stale.
+        // Use a ref? Or just re-calculate fully.
+        
+        // Let's re-calculate fully to be robust.
+        // 1. Get all nodes from `previousTree` (excluding dragged)
+        // 2. Find destination array.
+        // 3. Insert dragged node.
+        // 4. Map to IDs.
+        
+        // Extract
+        let draggedNodeItem: NavNode | undefined;
+        const removeNode = (nodes: NavNode[]): NavNode[] => {
+            return nodes.filter(n => {
+                if (n.id === dragId) {
+                    draggedNodeItem = n;
+                    return false;
+                }
+                if (n.children) n.children = removeNode(n.children);
+                return true;
+            });
+        };
+        const treeClean = removeNode(JSON.parse(JSON.stringify(previousTree)));
+        
+        if (!draggedNodeItem) return; // Should not happen
+
+        // Insert & Get Siblings IDs
+        let orderedIds: string[] = [];
+        
+        const insertAndGetIds = (nodes: NavNode[]): NavNode[] => {
+            const newNodes: NavNode[] = [];
+            let inserted = false;
+            
+            // If target is root and we are moving to root? 
+            // The logic depends on `targetId` and `position`.
+            
+            // Logic:
+            // If position 'inside', targetId is parent. We append/prepend to its children?
+            // Usually 'inside' means append.
+            
+            if (position === 'inside') {
+                 // Traverse to find targetId
+                 return nodes.map(n => {
+                     if (n.id === targetId) {
+                         const children = n.children || [];
+                         // Append to end for 'inside' usually, or specific logic?
+                         // Let's assume append.
+                         const newChildren = [...children, draggedNodeItem!];
+                         orderedIds = newChildren.map(c => c.id);
+                         return { ...n, children: newChildren };
+                     }
+                     if (n.children) return { ...n, children: insertAndGetIds(n.children) };
+                     return n;
+                 });
+            } else {
+                // Sibling move
+                // We iterate nodes. If we find targetId, we insert before/after.
+                // We also need to check if this is the correct parent level?
+                // `treeClean` is root level.
+                
+                // Helper to process list
+                const processList = (list: NavNode[]): { list: NavNode[], handled: boolean } => {
+                    const result: NavNode[] = [];
+                    let handledHere = false;
+                    
+                    for (const n of list) {
+                        if (n.id === targetId) {
+                            handledHere = true;
+                            if (position === 'top') {
+                                result.push(draggedNodeItem!, n);
+                            } else {
+                                result.push(n, draggedNodeItem!);
+                            }
+                        } else {
+                            result.push(n);
+                        }
+                        
+                        if (n.children && !handledHere) { // Optimization: don't look inside if target was this node (unless target can be inside target? No)
+                             const res = processList(n.children);
+                             if (res.handled) {
+                                 n.children = res.list;
+                                 // We found it deeper, so this level is not the one to capture orderedIds (unless we bubble up?)
+                                 // No, we need to capture IDs at the level where insertion happened.
+                             }
+                        }
+                    }
+                    
+                    if (handledHere) {
+                        orderedIds = result.map(x => x.id);
+                    }
+                    return { list: result, handled: handledHere };
+                };
+                
+                // Start from root
+                const res = processList(nodes);
+                // If handled at root level
+                if (res.handled) {
+                    orderedIds = res.list.map(x => x.id);
+                }
+                return res.list;
+            }
+        };
+        
+        insertAndGetIds(treeClean);
+        
+        // 4. Call Reorder API
+        if (orderedIds.length > 0) {
+            await api.navigation.reorderNodes(newParentId, orderedIds);
+        }
+
+    } catch (e) {
+        console.error('Failed to move node:', e);
+        setTree(previousTree);
+        addToast(language === 'zh' ? '移动失败' : 'Failed to move node', 'error');
+    }
+  }, [tree, addToast, language]);
+
+  const importTree = useCallback((newTree: NavNode[]) => {
+      setTree(newTree);
+      // Trigger full save for import
+      api.navigation.saveTree(newTree).catch(console.error);
+  }, []);
+
+  const updateGlobalStandards = useCallback((content: string) => {
+    setGlobalStandards(content);
+    // Persist
+    api.navigation.saveGlobalStandards(content).catch(console.error);
+  }, []);
+
+  return (
+    <NavigationContext.Provider value={{ 
+        tree, 
+        globalStandards, 
+        updateGlobalStandards,
+        addNode, 
+        updateNode, 
+        deleteNode, 
+        toggleReady, 
+        moveNode,
+        importTree
+    }}>
+      {children}
+    </NavigationContext.Provider>
+  );
+};
+
+export const useNavigation = () => {
+  const context = useContext(NavigationContext);
+  if (!context) throw new Error('useNavigation must be used within NavigationProvider');
+  return context;
+};
+
+// --- Toast Context ---
+interface ToastContextType {
+  toasts: ToastMessage[];
+  addToast: (message: string, type?: ToastType) => void;
+  removeToast: (id: string) => void;
+}
+
+const ToastContext = createContext<ToastContextType | undefined>(undefined);
+
+export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const addToast = useCallback((message: string, type: ToastType = 'info') => {
+    const id = Date.now().toString();
+    setToasts((prev) => [...prev, { id, message, type }]);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  return (
+    <ToastContext.Provider value={{ toasts, addToast, removeToast }}>
+      {children}
+    </ToastContext.Provider>
+  );
+};
+
+export const useToast = () => {
+  const context = useContext(ToastContext);
+  if (!context) throw new Error('useToast must be used within ToastProvider');
+  return context;
+};
+
+// --- Integration Context ---
+interface LLMConfig {
+  provider: string;
+  model: string;
+  baseUrl: string;
+  apiKey: string;
+  maxTokens: number;
+  temperature: number;
+}
+
+interface DBConfig {
+  type: string;
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+}
+
+interface IntegrationContextType {
+  llmConfig: LLMConfig;
+  updateLlmConfig: (config: Partial<LLMConfig>) => Promise<void>;
+  dbConfig: DBConfig;
+  updateDbConfig: (config: Partial<DBConfig>) => Promise<void>;
+  integrations: IntegrationConfig[];
+  updateIntegration: (key: string, updates: Partial<IntegrationConfig>) => Promise<void>;
+}
+
+const IntegrationContext = createContext<IntegrationContextType | undefined>(undefined);
+
+export const IntegrationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [integrations, setIntegrations] = useState<IntegrationConfig[]>([]);
+
+  useEffect(() => {
+    api.integrations.getAll().then(data => {
+        if (data && data.length > 0) setIntegrations(data);
+    }).catch(console.error);
+  }, []);
+
+  const getIntegration = (key: string) => integrations.find(i => i.key === key);
+
+  const defaultLlmConfig: LLMConfig = {
+    provider: 'google',
+    model: 'gemini-3-pro-preview',
+    baseUrl: 'https://generativelanguage.googleapis.com',
+    apiKey: process.env.API_KEY || '', 
+    maxTokens: 20480,
+    temperature: 0.7
+  };
+
+  const defaultDbConfig: DBConfig = {
+    type: 'mysql',
+    host: 'localhost',
+    port: 3306,
+    database: 'restosuite_core',
+    username: 'root',
+    password: ''
+  };
+
+  const llmConfig: LLMConfig = { ...defaultLlmConfig, ...getIntegration('llm_global')?.config };
+  const dbConfig: DBConfig = { ...defaultDbConfig, ...getIntegration('db_global')?.config };
+
+  const updateIntegration = async (key: string, updates: Partial<IntegrationConfig>) => {
+      setIntegrations(prev => prev.map(i => {
+          if (i.key === key) {
+              const updated = { ...i, ...updates };
+              if (updates.config) updated.config = { ...i.config, ...updates.config };
+              return updated;
+          }
+          return i;
+      }));
+
+      if (updates.enabled !== undefined) {
+          await api.integrations.toggle(key, updates.enabled);
+      }
+      if (updates.config) {
+          await api.integrations.update(key, { config: updates.config });
+      }
+  };
+
+  const updateLlmConfig = async (config: Partial<LLMConfig>) => {
+    const newConfig = { ...llmConfig, ...config };
+    await updateIntegration('llm_global', { config: newConfig });
+  };
+
+  const updateDbConfig = async (config: Partial<DBConfig>) => {
+    const newConfig = { ...dbConfig, ...config };
+    await updateIntegration('db_global', { config: newConfig });
+  };
+
+  return (
+    <IntegrationContext.Provider value={{ llmConfig, updateLlmConfig, dbConfig, updateDbConfig, integrations, updateIntegration }}>
+      {children}
+    </IntegrationContext.Provider>
+  );
+};
+
+export const useIntegration = () => {
+  const context = useContext(IntegrationContext);
+  if (!context) throw new Error('useIntegration must be used within IntegrationProvider');
+  return context;
+};

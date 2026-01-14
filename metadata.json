@@ -1,0 +1,7 @@
+{
+  "name": "T-Engine",
+  "description": "Internal IT Intent Hub for RestoSuite - Managing Requirements, Logic, and AI Context.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

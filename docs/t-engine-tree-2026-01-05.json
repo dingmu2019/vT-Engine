@@ -1,0 +1,742 @@
+[
+  {
+    "id": "home",
+    "icon": "home",
+    "type": "module",
+    "label": "Home",
+    "status": "ready",
+    "labelZh": "首页"
+  },
+  {
+    "id": "product",
+    "icon": "package",
+    "type": "folder",
+    "label": "Product Management",
+    "status": "draft",
+    "labelZh": "商品管理",
+    "children": [
+      {
+        "id": "prod_type",
+        "icon": "tags",
+        "type": "module",
+        "label": "Product Type",
+        "status": "draft",
+        "labelZh": "商品类型管理"
+      },
+      {
+        "id": "prod_category",
+        "icon": "library",
+        "type": "module",
+        "label": "Category",
+        "status": "draft",
+        "labelZh": "商品分类管理"
+      },
+      {
+        "id": "prod_item",
+        "icon": "shopping-bag",
+        "type": "module",
+        "label": "Product Item",
+        "status": "draft",
+        "labelZh": "商品管理"
+      },
+      {
+        "id": "prod_combo",
+        "icon": "layers",
+        "type": "module",
+        "label": "Combo",
+        "status": "draft",
+        "labelZh": "商品套餐管理"
+      },
+      {
+        "id": "prod_promotion",
+        "icon": "percent",
+        "type": "module",
+        "label": "Promotion",
+        "status": "draft",
+        "labelZh": "商品促销管理"
+      }
+    ]
+  },
+  {
+    "id": "market_sales",
+    "icon": "trending-up",
+    "type": "folder",
+    "label": "Market & Sales Management",
+    "status": "ready",
+    "labelZh": "市场&销售管理",
+    "children": [
+      {
+        "id": "lead",
+        "icon": "user-plus",
+        "type": "module",
+        "label": "Lead",
+        "status": "ready",
+        "labelZh": "线索"
+      },
+      {
+        "id": "opportunity",
+        "icon": "target",
+        "type": "module",
+        "label": "Opportunity",
+        "status": "ready",
+        "labelZh": "商机"
+      },
+      {
+        "id": "customer",
+        "icon": "users",
+        "type": "module",
+        "label": "Customer",
+        "status": "ready",
+        "labelZh": "客户"
+      },
+      {
+        "id": "presales",
+        "icon": "presentation",
+        "type": "module",
+        "label": "Pre-sales",
+        "status": "draft",
+        "labelZh": "售前"
+      },
+      {
+        "id": "quote",
+        "icon": "file-text",
+        "type": "module",
+        "label": "Quote",
+        "status": "draft",
+        "labelZh": "报价单"
+      },
+      {
+        "id": "contract",
+        "icon": "file-signature",
+        "type": "module",
+        "label": "Contract",
+        "status": "ready",
+        "labelZh": "合同"
+      },
+      {
+        "id": "order",
+        "icon": "shopping-cart",
+        "type": "module",
+        "label": "Order",
+        "status": "ready",
+        "labelZh": "订单"
+      },
+      {
+        "id": "promo_rules",
+        "icon": "settings-2",
+        "type": "module",
+        "label": "Incentive & Promotion",
+        "status": "draft",
+        "labelZh": "激励与促销"
+      }
+    ]
+  },
+  {
+    "id": "service_delivery",
+    "icon": "truck",
+    "type": "folder",
+    "label": "Delivery & Service Management",
+    "status": "draft",
+    "labelZh": "交付&服务管理",
+    "children": [
+      {
+        "id": "project",
+        "icon": "briefcase",
+        "type": "module",
+        "label": "Implementation Project",
+        "status": "draft",
+        "labelZh": "实施项目"
+      },
+      {
+        "id": "hardware_outbound",
+        "icon": "package",
+        "type": "module",
+        "label": "Hardware Outbound",
+        "status": "draft",
+        "labelZh": "硬件出库"
+      },
+      {
+        "id": "license_issuance",
+        "icon": "key",
+        "type": "module",
+        "label": "License Issuance",
+        "status": "draft",
+        "labelZh": "授权发放"
+      },
+      {
+        "id": "ticket",
+        "icon": "ticket",
+        "type": "module",
+        "label": "Implementation Ticket",
+        "status": "draft",
+        "labelZh": "实施工单"
+      },
+      {
+        "id": "resource",
+        "icon": "hard-hat",
+        "type": "module",
+        "label": "Resource Pool",
+        "status": "draft",
+        "labelZh": "资源池"
+      },
+      {
+        "id": "after_sales_ticket",
+        "icon": "ticket-check",
+        "type": "module",
+        "label": "After-sales Ticket",
+        "status": "draft",
+        "labelZh": "售后工单"
+      },
+      {
+        "id": "top_issues",
+        "icon": "alert-triangle",
+        "type": "module",
+        "label": "TOP-10 Issues",
+        "status": "draft",
+        "labelZh": "TOP-10问题"
+      }
+    ]
+  },
+  {
+    "id": "tenant",
+    "icon": "building",
+    "type": "folder",
+    "label": "Tenant & Authorization Management",
+    "status": "draft",
+    "labelZh": "租户&授权管理",
+    "children": [
+      {
+        "id": "group",
+        "icon": "building-2",
+        "type": "module",
+        "label": "Group",
+        "status": "draft",
+        "labelZh": "集团"
+      },
+      {
+        "id": "store",
+        "icon": "store",
+        "type": "module",
+        "label": "Store",
+        "status": "ready",
+        "labelZh": "门店"
+      },
+      {
+        "id": "auth",
+        "icon": "key",
+        "type": "module",
+        "label": "Authorization",
+        "status": "ready",
+        "labelZh": "授权"
+      }
+    ]
+  },
+  {
+    "id": "operation",
+    "icon": "cpu",
+    "type": "folder",
+    "label": "Operation Management",
+    "status": "ready",
+    "labelZh": "运营管理",
+    "children": [
+      {
+        "id": "op_project",
+        "icon": "folder-kanban",
+        "type": "module",
+        "label": "Project",
+        "status": "draft",
+        "labelZh": "项目"
+      },
+      {
+        "id": "op_ticket",
+        "icon": "ticket-check",
+        "type": "module",
+        "label": "Ticket",
+        "status": "draft",
+        "labelZh": "工单"
+      },
+      {
+        "id": "task",
+        "icon": "check-square",
+        "type": "module",
+        "label": "Task",
+        "status": "draft",
+        "labelZh": "任务"
+      },
+      {
+        "id": "allocation",
+        "icon": "arrow-left-right",
+        "type": "module",
+        "label": "Allocation",
+        "status": "draft",
+        "labelZh": "划拨"
+      },
+      {
+        "id": "approval",
+        "icon": "stamp",
+        "type": "module",
+        "label": "Approval",
+        "status": "draft",
+        "labelZh": "审批"
+      },
+      {
+        "id": "message",
+        "icon": "bell",
+        "type": "module",
+        "label": "Message",
+        "status": "draft",
+        "labelZh": "消息"
+      },
+      {
+        "id": "feedback",
+        "icon": "message-square",
+        "type": "module",
+        "label": "Feedback",
+        "status": "draft",
+        "labelZh": "反馈"
+      },
+      {
+        "id": "knowledge",
+        "icon": "book-open",
+        "type": "module",
+        "label": "Knowledge",
+        "status": "draft",
+        "labelZh": "知识"
+      },
+      {
+        "id": "email",
+        "icon": "mail",
+        "type": "module",
+        "label": "Email",
+        "status": "draft",
+        "labelZh": "邮箱"
+      },
+      {
+        "id": "chat",
+        "icon": "message-circle",
+        "type": "module",
+        "label": "Chat",
+        "status": "draft",
+        "labelZh": "沟通"
+      }
+    ]
+  },
+  {
+    "id": "finance",
+    "icon": "badge-dollar-sign",
+    "type": "folder",
+    "label": "Finance Management",
+    "status": "draft",
+    "labelZh": "财务管理",
+    "children": [
+      {
+        "id": "invoice",
+        "icon": "file-check",
+        "type": "module",
+        "label": "Invoicing",
+        "status": "draft",
+        "labelZh": "开票"
+      },
+      {
+        "id": "collection",
+        "icon": "wallet",
+        "type": "module",
+        "label": "Payment Collection",
+        "status": "draft",
+        "labelZh": "回款"
+      },
+      {
+        "id": "settlement",
+        "icon": "scale",
+        "type": "module",
+        "label": "Partner Settlement",
+        "status": "draft",
+        "labelZh": "伙伴结算"
+      },
+      {
+        "id": "receivable",
+        "icon": "file-text",
+        "type": "module",
+        "label": "Receivables",
+        "status": "draft",
+        "labelZh": "应收"
+      },
+      {
+        "id": "bad_debt",
+        "icon": "alert-triangle",
+        "type": "module",
+        "label": "Bad Debts",
+        "status": "draft",
+        "labelZh": "坏账"
+      }
+    ]
+  },
+  {
+    "id": "rnd",
+    "icon": "bug",
+    "type": "folder",
+    "label": "Requirements & BUG",
+    "status": "draft",
+    "labelZh": "需求&BUG管理",
+    "children": [
+      {
+        "id": "requirement",
+        "icon": "file-code",
+        "type": "module",
+        "label": "Requirement",
+        "status": "draft",
+        "labelZh": "需求"
+      },
+      {
+        "id": "defect",
+        "icon": "alert-triangle",
+        "type": "module",
+        "label": "BUG",
+        "status": "draft",
+        "labelZh": "BUG"
+      }
+    ]
+  },
+  {
+    "id": "partner_eco",
+    "icon": "network",
+    "type": "folder",
+    "label": "User & Organization Management",
+    "status": "draft",
+    "labelZh": "用户&组织管理",
+    "children": [
+      {
+        "id": "partner",
+        "icon": "handshake",
+        "type": "module",
+        "label": "Partner",
+        "status": "draft",
+        "labelZh": "伙伴"
+      },
+      {
+        "id": "user",
+        "icon": "user-circle",
+        "type": "module",
+        "label": "User",
+        "status": "draft",
+        "labelZh": "用户"
+      },
+      {
+        "id": "group_mgmt",
+        "icon": "users",
+        "type": "module",
+        "label": "Group Management",
+        "status": "draft",
+        "labelZh": "群组管理"
+      }
+    ]
+  },
+  {
+    "id": "dashboard",
+    "icon": "bar-chart-3",
+    "type": "folder",
+    "label": "Data Dashboard",
+    "status": "draft",
+    "labelZh": "数据看板",
+    "children": [
+      {
+        "id": "report_lead",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Lead Report",
+        "status": "draft",
+        "labelZh": "线索报表"
+      },
+      {
+        "id": "report_opportunity",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Opportunity Report",
+        "status": "draft",
+        "labelZh": "商机报表"
+      },
+      {
+        "id": "report_customer",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Customer Report",
+        "status": "draft",
+        "labelZh": "客户报表"
+      },
+      {
+        "id": "report_presales",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Pre-sales Report",
+        "status": "draft",
+        "labelZh": "售前报表"
+      },
+      {
+        "id": "report_order",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Order Report",
+        "status": "draft",
+        "labelZh": "订单报表"
+      },
+      {
+        "id": "report_collection",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Collection Report",
+        "status": "draft",
+        "labelZh": "回款报表"
+      },
+      {
+        "id": "report_invoice",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Invoice Report",
+        "status": "draft",
+        "labelZh": "开票报表"
+      },
+      {
+        "id": "report_product_sales",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Product Sales Report",
+        "status": "draft",
+        "labelZh": "产品销售报表"
+      },
+      {
+        "id": "report_tenant",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Tenant Report",
+        "status": "draft",
+        "labelZh": "租户报表"
+      },
+      {
+        "id": "report_project",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Project Report",
+        "status": "draft",
+        "labelZh": "项目报表"
+      },
+      {
+        "id": "report_ticket",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Ticket Report",
+        "status": "draft",
+        "labelZh": "工单报表"
+      },
+      {
+        "id": "report_task",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Task Report",
+        "status": "draft",
+        "labelZh": "任务报表"
+      },
+      {
+        "id": "report_approval",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Approval Report",
+        "status": "draft",
+        "labelZh": "审批报表"
+      },
+      {
+        "id": "report_user",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "User Report",
+        "status": "draft",
+        "labelZh": "用户报表"
+      },
+      {
+        "id": "report_partner_commission",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Partner Commission Report",
+        "status": "draft",
+        "labelZh": "伙伴返佣报表"
+      },
+      {
+        "id": "report_sales_perf",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Sales Performance Report",
+        "status": "draft",
+        "labelZh": "销售业绩报表"
+      },
+      {
+        "id": "report_resource",
+        "icon": "line-chart",
+        "type": "module",
+        "label": "Resource Pool Report",
+        "status": "draft",
+        "labelZh": "资源池报表"
+      }
+    ]
+  },
+  {
+    "id": "system_settings",
+    "icon": "settings",
+    "type": "folder",
+    "label": "System Settings",
+    "status": "draft",
+    "labelZh": "系统设置",
+    "children": [
+      {
+        "id": "sys_profile",
+        "icon": "user-cog",
+        "type": "module",
+        "label": "Personal Settings",
+        "status": "draft",
+        "labelZh": "个人设置"
+      },
+      {
+        "id": "sys_role_perm",
+        "icon": "shield",
+        "type": "module",
+        "label": "Role & Permissions",
+        "status": "draft",
+        "labelZh": "系统角色及权限管理"
+      },
+      {
+        "id": "sys_org",
+        "icon": "building-2",
+        "type": "module",
+        "label": "Organization",
+        "status": "draft",
+        "labelZh": "组织管理"
+      },
+      {
+        "id": "sys_sensitive",
+        "icon": "lock",
+        "type": "module",
+        "label": "Sensitive Data",
+        "status": "draft",
+        "labelZh": "敏感数据管理"
+      },
+      {
+        "id": "sys_translation",
+        "icon": "languages",
+        "type": "module",
+        "label": "Translation",
+        "status": "draft",
+        "labelZh": "翻译管理"
+      },
+      {
+        "id": "sys_template",
+        "icon": "copy",
+        "type": "module",
+        "label": "Sales Templates",
+        "status": "draft",
+        "labelZh": "销售相关模版管理"
+      },
+      {
+        "id": "sys_task_pool",
+        "icon": "list-todo",
+        "type": "module",
+        "label": "Standard Task Pool",
+        "status": "draft",
+        "labelZh": "标准任务池"
+      },
+      {
+        "id": "sys_wbs_tpl",
+        "icon": "gantt-chart",
+        "type": "module",
+        "label": "Project WBS Template",
+        "status": "draft",
+        "labelZh": "项目WBS模版"
+      },
+      {
+        "id": "sys_ticket_tpl",
+        "icon": "ticket",
+        "type": "module",
+        "label": "Ticket Configuration",
+        "status": "draft",
+        "labelZh": "工单配置"
+      },
+      {
+        "id": "sys_approval_tpl",
+        "icon": "stamp",
+        "type": "module",
+        "label": "Approval Template",
+        "status": "draft",
+        "labelZh": "审批模版"
+      },
+      {
+        "id": "sys_notification",
+        "icon": "bell",
+        "type": "module",
+        "label": "Notification Config",
+        "status": "draft",
+        "labelZh": "通知配置"
+      },
+      {
+        "id": "sys_notify_mgr",
+        "icon": "bell-ring",
+        "type": "module",
+        "label": "Message Log Management",
+        "status": "draft",
+        "labelZh": "消息日志管理"
+      },
+      {
+        "id": "sys_params",
+        "icon": "sliders",
+        "type": "module",
+        "label": "System Parameters",
+        "status": "draft",
+        "labelZh": "系统参数管理"
+      },
+      {
+        "id": "sys_dict",
+        "icon": "database",
+        "type": "module",
+        "label": "Data Dictionary",
+        "status": "draft",
+        "labelZh": "字典管理"
+      },
+      {
+        "id": "sys_logs",
+        "icon": "scroll-text",
+        "type": "module",
+        "label": "System Logs",
+        "status": "draft",
+        "labelZh": "日志管理"
+      },
+      {
+        "id": "sys_integration",
+        "icon": "blocks",
+        "type": "module",
+        "label": "Integration",
+        "status": "draft",
+        "labelZh": "集成管理"
+      },
+      {
+        "id": "sys_enterprise",
+        "icon": "building",
+        "type": "module",
+        "label": "Enterprise Info",
+        "status": "draft",
+        "labelZh": "企业信息"
+      },
+      {
+        "id": "sys_agent",
+        "icon": "bot",
+        "type": "module",
+        "label": "Agent Management",
+        "status": "draft",
+        "labelZh": "Agent 管理"
+      },
+      {
+        "id": "sys_api_keys",
+        "icon": "key",
+        "type": "module",
+        "label": "App & API Keys",
+        "status": "draft",
+        "labelZh": "应用及API Key管理"
+      }
+    ]
+  }
+]

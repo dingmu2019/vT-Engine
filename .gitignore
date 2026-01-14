@@ -1,0 +1,9 @@
+# Node.js依赖
+node_modules/
+# 包管理锁文件（可选，根据团队习惯）
+package-lock.json
+yarn.lock
+# 日志文件
+*.log
+# 环境变量文件
+.env

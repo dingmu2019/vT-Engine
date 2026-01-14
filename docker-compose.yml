@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: .
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  backend:
+    build: ./server
+    ports:
+      - "3001:3001"
+    env_file:
+      - ./server/.env
+    environment:
+      - PORT=3001
